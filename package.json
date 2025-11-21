@@ -1,0 +1,56 @@
+{
+  "name": "omniforge-council",
+  "version": "1.0.0",
+  "description": "OmniForge Multi-LLM Council - A self-optimizing, cross-reasoning, multi-agent intelligence engine",
+  "main": "dist/server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "ts-node-dev --respawn --transpile-only src/server/index.ts",
+    "dev:client": "vite",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:client": "vite build",
+    "start": "node dist/server/index.js",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "jest"
+  },
+  "keywords": [
+    "ai",
+    "multi-agent",
+    "llm",
+    "council",
+    "orchestration",
+    "asi"
+  ],
+  "author": "MASSIVEMAGNETICS",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "ws": "^8.14.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "framer-motion": "^10.16.4",
+    "react-icons": "^4.11.0",
+    "zustand": "^4.4.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/cors": "^2.8.15",
+    "@types/ws": "^8.5.8",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@types/node": "^20.8.10",
+    "@typescript-eslint/eslint-plugin": "^6.9.1",
+    "@typescript-eslint/parser": "^6.9.1",
+    "@vitejs/plugin-react": "^4.1.1",
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0",
+    "ts-node-dev": "^2.0.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.52.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.6"
+  }
+}
