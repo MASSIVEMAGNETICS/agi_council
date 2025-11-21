@@ -16,8 +16,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
-  "include": ["src/client"],
+  "include": ["src/client", "src/shared"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
