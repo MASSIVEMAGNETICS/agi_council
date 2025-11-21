@@ -7,6 +7,8 @@ import {
   UserQuery
 } from '../../shared/types';
 
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
+
 interface AppState {
   councilState: CouncilState | null;
   sessionMessages: SessionMessage[];
@@ -43,7 +45,7 @@ const useStore = create<AppState>((set, get) => ({
   setIsProcessing: (processing) => set({ isProcessing: processing }),
   
   connectWebSocket: () => {
-    const ws = new WebSocket('ws://localhost:3001/ws');
+    const ws = new WebSocket(WS_URL);
     
     ws.onopen = () => {
       console.log('WebSocket connected');

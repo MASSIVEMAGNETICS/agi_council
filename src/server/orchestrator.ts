@@ -296,7 +296,7 @@ export class CouncilOrchestrator {
     // Generate cross-agent interactions
     for (let i = 0; i < responses.length; i++) {
       for (let j = 0; j < responses.length; j++) {
-        if (i !== j && Math.random() > (1 - this.CROSS_AGENT_INTERACTION_PROBABILITY)) {
+        if (i !== j && Math.random() < this.CROSS_AGENT_INTERACTION_PROBABILITY) {
           const from = this.state.agents[i];
           const to = this.state.agents[j];
           const types: Array<'challenge' | 'support' | 'critique' | 'refine'> = 
@@ -516,5 +516,17 @@ export class CouncilOrchestrator {
 
   updateConfig(config: Partial<CouncilState>): void {
     this.state = { ...this.state, ...config };
+  }
+
+  setInteractionProbability(probability: number): void {
+    if (probability >= 0 && probability <= 1) {
+      (this as any).CROSS_AGENT_INTERACTION_PROBABILITY = probability;
+    }
+  }
+
+  setDebateThreshold(threshold: number): void {
+    if (threshold >= 0 && threshold <= 100) {
+      (this as any).DEBATE_DISAGREEMENT_THRESHOLD = threshold;
+    }
   }
 }
