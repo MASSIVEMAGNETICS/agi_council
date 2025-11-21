@@ -17,6 +17,8 @@ import {
 export class CouncilOrchestrator {
   private state: CouncilState;
   private sessionHistory: Map<string, SessionMessage[]>;
+  private readonly CROSS_AGENT_INTERACTION_PROBABILITY = 0.4; // 40% chance
+  private readonly DEBATE_DISAGREEMENT_THRESHOLD = 20; // Percentage
 
   constructor(councilSize: number = 6, primeArchitect: string = 'Prime Architect') {
     this.sessionHistory = new Map();
@@ -221,6 +223,7 @@ export class CouncilOrchestrator {
     let predictiveOutput: PredictiveModeOutput | undefined;
     if (query.modes.includes(CouncilMode.PREDICT)) {
       predictiveOutput = await this.generatePredictiveOutput(query, synthesis);
+      // Add predictive analysis as an extension of synthesis phase
       phases.push({
         phase: 'synthesis',
         predictiveOutput,
@@ -293,7 +296,7 @@ export class CouncilOrchestrator {
     // Generate cross-agent interactions
     for (let i = 0; i < responses.length; i++) {
       for (let j = 0; j < responses.length; j++) {
-        if (i !== j && Math.random() > 0.6) { // 40% chance of interaction
+        if (i !== j && Math.random() > (1 - this.CROSS_AGENT_INTERACTION_PROBABILITY)) {
           const from = this.state.agents[i];
           const to = this.state.agents[j];
           const types: Array<'challenge' | 'support' | 'critique' | 'refine'> = 
@@ -324,7 +327,7 @@ export class CouncilOrchestrator {
     const challengeCount = comments.filter(c => c.type === 'challenge').length;
     const disagreementPercentage = (challengeCount / comments.length) * 100;
 
-    if (disagreementPercentage > 20) {
+    if (disagreementPercentage > this.DEBATE_DISAGREEMENT_THRESHOLD) {
       conflicts.push({
         topic: 'Core approach and methodology',
         agents: this.state.agents.map(a => a.name),
