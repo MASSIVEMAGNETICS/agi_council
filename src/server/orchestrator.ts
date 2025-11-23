@@ -223,12 +223,11 @@ export class CouncilOrchestrator {
     let predictiveOutput: PredictiveModeOutput | undefined;
     if (query.modes.includes(CouncilMode.PREDICT)) {
       predictiveOutput = await this.generatePredictiveOutput(query, synthesis);
-      // Add predictive analysis as an extension of synthesis phase
-      phases.push({
-        phase: 'synthesis',
-        predictiveOutput,
-        timestamp: Date.now()
-      });
+      // Add predictive output with synthesis phase for combined display
+      const synthesisPhase = phases.find(p => p.phase === 'synthesis');
+      if (synthesisPhase) {
+        synthesisPhase.predictiveOutput = predictiveOutput;
+      }
     }
 
     // Phase 6: Refinement Loops

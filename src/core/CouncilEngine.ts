@@ -302,11 +302,11 @@ export class CouncilEngine extends EventEmitter {
       if (query.modes.includes(CouncilMode.PREDICT)) {
         this.emit('phase:start', { phase: 'predict', sessionId });
         predictiveOutput = await this.generatePredictiveOutput(query, synthesis);
-        phases.push({
-          phase: 'synthesis',
-          predictiveOutput,
-          timestamp: Date.now()
-        });
+        // Add predictive output with synthesis phase for combined display
+        const synthesisPhase = phases.find(p => p.phase === 'synthesis');
+        if (synthesisPhase) {
+          synthesisPhase.predictiveOutput = predictiveOutput;
+        }
         this.emit('phase:complete', { phase: 'predict', sessionId, data: predictiveOutput });
       }
 

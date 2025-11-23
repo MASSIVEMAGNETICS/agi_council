@@ -5,7 +5,7 @@ import {
   SessionMessage,
   CouncilResponse,
   UserQuery
-} from '../../shared/types';
+} from '../shared/types';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
 
