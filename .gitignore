@@ -1,6 +1,10 @@
 node_modules/
 dist/
+release/
+build/
 .env
+.env.local
+.env.production
 .DS_Store
 *.log
 coverage/
@@ -10,3 +14,19 @@ coverage/
 *.swo
 *~
 .eslintcache
+
+# Platform-specific
+platforms/mobile/ios/App/Pods/
+platforms/mobile/ios/App/App.xcworkspace
+platforms/mobile/android/.gradle/
+platforms/mobile/android/app/build/
+platforms/mobile/android/app/release/
+*.keystore
+
+# Database
+*.db
+*.sqlite
+
+# OS
+Thumbs.db
+
