@@ -1,3 +1,10 @@
+/**
+ * Enterprise-grade Council Engine
+ * Core orchestration engine for multi-agent AI system
+ * Platform-agnostic implementation
+ */
+
+import { EventEmitter } from 'events';
 import {
   AgentConfig,
   AgentArchetype,
@@ -14,22 +21,75 @@ import {
   CouncilState
 } from '../shared/types';
 
-export class CouncilOrchestrator {
+export interface CouncilEngineConfig {
+  councilSize?: number;
+  primeArchitect?: string;
+  maxRefinementCycles?: number;
+  interactionProbability?: number;
+  debateThreshold?: number;
+  enableLogging?: boolean;
+  enableMetrics?: boolean;
+}
+
+export interface CouncilMetrics {
+  sessionsProcessed: number;
+  averageResponseTime: number;
+  agentResponseCount: Record<string, number>;
+  debateResolutionRate: number;
+  consensusRate: number;
+}
+
+export class CouncilEngine extends EventEmitter {
   private state: CouncilState;
   private sessionHistory: Map<string, SessionMessage[]>;
-  private readonly CROSS_AGENT_INTERACTION_PROBABILITY = 0.4; // 40% chance
-  private readonly DEBATE_DISAGREEMENT_THRESHOLD = 20; // Percentage
+  private metrics: CouncilMetrics;
+  private config: Required<CouncilEngineConfig>;
 
-  constructor(councilSize: number = 6, primeArchitect: string = 'Prime Architect') {
+  private readonly CROSS_AGENT_INTERACTION_PROBABILITY: number;
+  private readonly DEBATE_DISAGREEMENT_THRESHOLD: number;
+
+  constructor(config: CouncilEngineConfig = {}) {
+    super();
+    
+    this.config = {
+      councilSize: config.councilSize || 6,
+      primeArchitect: config.primeArchitect || 'Prime Architect',
+      maxRefinementCycles: config.maxRefinementCycles || 2,
+      interactionProbability: config.interactionProbability || 0.4,
+      debateThreshold: config.debateThreshold || 20,
+      enableLogging: config.enableLogging !== false,
+      enableMetrics: config.enableMetrics !== false
+    };
+
+    this.CROSS_AGENT_INTERACTION_PROBABILITY = this.config.interactionProbability;
+    this.DEBATE_DISAGREEMENT_THRESHOLD = this.config.debateThreshold;
+
     this.sessionHistory = new Map();
-    this.state = {
-      councilSize,
-      agents: this.initializeAgents(councilSize - 1), // -1 for user
-      primeArchitect,
+    this.metrics = this.initializeMetrics();
+    this.state = this.initializeState();
+
+    this.log('CouncilEngine initialized with config:', this.config);
+  }
+
+  private initializeState(): CouncilState {
+    return {
+      councilSize: this.config.councilSize,
+      agents: this.initializeAgents(this.config.councilSize - 1),
+      primeArchitect: this.config.primeArchitect,
       currentMode: CouncilMode.DEBATE,
       activeModes: [CouncilMode.DEBATE],
       refinementCycle: 0,
-      maxRefinementCycles: 2
+      maxRefinementCycles: this.config.maxRefinementCycles
+    };
+  }
+
+  private initializeMetrics(): CouncilMetrics {
+    return {
+      sessionsProcessed: 0,
+      averageResponseTime: 0,
+      agentResponseCount: {},
+      debateResolutionRate: 0,
+      consensusRate: 0
     };
   }
 
@@ -172,102 +232,146 @@ export class CouncilOrchestrator {
     }));
   }
 
+  /**
+   * Process a user query through the council pipeline
+   * Enterprise-grade implementation with error handling and metrics
+   */
   async processQuery(query: UserQuery): Promise<CouncilResponse> {
-    const sessionId = `session-${Date.now()}`;
-    const phases: SessionMessage[] = [];
+    const startTime = Date.now();
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    
+    this.log(`Processing query for session ${sessionId}`);
+    this.emit('session:start', { sessionId, query });
 
-    this.state.activeModes = query.modes;
-    this.state.refinementCycle = 0;
+    try {
+      const phases: SessionMessage[] = [];
 
-    // Phase 1: Initial Agent Responses
-    const initialResponses = await this.generateInitialResponses(query);
-    phases.push({
-      phase: 'initial',
-      agentMessages: initialResponses,
-      timestamp: Date.now()
-    });
+      this.state.activeModes = query.modes;
+      this.state.refinementCycle = 0;
 
-    // Phase 2: Cross-Agent Commentary
-    const crossAgentComments = await this.generateCrossAgentComments(initialResponses);
-    phases.push({
-      phase: 'cross-agent',
-      crossAgentComments,
-      timestamp: Date.now()
-    });
-
-    // Phase 3: Debate Cycle (if needed)
-    const debateConflicts = await this.detectDebateNeeds(initialResponses, crossAgentComments);
-    if (debateConflicts.length > 0) {
-      const debateResults = await this.conductDebate(debateConflicts, query);
+      // Phase 1: Initial Agent Responses
+      this.emit('phase:start', { phase: 'initial', sessionId });
+      const initialResponses = await this.generateInitialResponses(query);
       phases.push({
-        phase: 'debate',
-        debateConflicts: debateResults,
+        phase: 'initial',
+        agentMessages: initialResponses,
         timestamp: Date.now()
       });
-    }
+      this.emit('phase:complete', { phase: 'initial', sessionId, data: initialResponses });
 
-    // Phase 4: Synthesis
-    const synthesis = await this.generateSynthesis(
-      initialResponses,
-      crossAgentComments,
-      debateConflicts,
-      query
-    );
-    phases.push({
-      phase: 'synthesis',
-      synthesis,
-      timestamp: Date.now()
-    });
+      // Phase 2: Cross-Agent Commentary
+      this.emit('phase:start', { phase: 'cross-agent', sessionId });
+      const crossAgentComments = await this.generateCrossAgentComments(initialResponses);
+      phases.push({
+        phase: 'cross-agent',
+        crossAgentComments,
+        timestamp: Date.now()
+      });
+      this.emit('phase:complete', { phase: 'cross-agent', sessionId, data: crossAgentComments });
 
-    // Phase 5: Predictive Output (if Predict mode active)
-    let predictiveOutput: PredictiveModeOutput | undefined;
-    if (query.modes.includes(CouncilMode.PREDICT)) {
-      predictiveOutput = await this.generatePredictiveOutput(query, synthesis);
-      // Add predictive output with synthesis phase for combined display
-      const synthesisPhase = phases.find(p => p.phase === 'synthesis');
-      if (synthesisPhase) {
-        synthesisPhase.predictiveOutput = predictiveOutput;
+      // Phase 3: Debate Cycle (if needed)
+      const debateConflicts = await this.detectDebateNeeds(initialResponses, crossAgentComments);
+      if (debateConflicts.length > 0) {
+        this.emit('phase:start', { phase: 'debate', sessionId });
+        const debateResults = await this.conductDebate(debateConflicts, query);
+        phases.push({
+          phase: 'debate',
+          debateConflicts: debateResults,
+          timestamp: Date.now()
+        });
+        this.emit('phase:complete', { phase: 'debate', sessionId, data: debateResults });
       }
-    }
 
-    // Phase 6: Refinement Loops
-    for (let i = 0; i < this.state.maxRefinementCycles; i++) {
-      this.state.refinementCycle = i + 1;
-      const refinementFeedback = await this.generateRefinementFeedback(synthesis);
+      // Phase 4: Synthesis
+      this.emit('phase:start', { phase: 'synthesis', sessionId });
+      const synthesis = await this.generateSynthesis(
+        initialResponses,
+        crossAgentComments,
+        debateConflicts,
+        query
+      );
       phases.push({
-        phase: 'refinement',
-        agentMessages: refinementFeedback,
+        phase: 'synthesis',
+        synthesis,
         timestamp: Date.now()
       });
+      this.emit('phase:complete', { phase: 'synthesis', sessionId, data: synthesis });
+
+      // Phase 5: Predictive Output (if Predict mode active)
+      let predictiveOutput: PredictiveModeOutput | undefined;
+      if (query.modes.includes(CouncilMode.PREDICT)) {
+        this.emit('phase:start', { phase: 'predict', sessionId });
+        predictiveOutput = await this.generatePredictiveOutput(query, synthesis);
+        // Add predictive output with synthesis phase for combined display
+        const synthesisPhase = phases.find(p => p.phase === 'synthesis');
+        if (synthesisPhase) {
+          synthesisPhase.predictiveOutput = predictiveOutput;
+        }
+        this.emit('phase:complete', { phase: 'predict', sessionId, data: predictiveOutput });
+      }
+
+      // Phase 6: Refinement Loops
+      for (let i = 0; i < this.state.maxRefinementCycles; i++) {
+        this.state.refinementCycle = i + 1;
+        this.emit('phase:start', { phase: 'refinement', sessionId, cycle: i + 1 });
+        const refinementFeedback = await this.generateRefinementFeedback(synthesis);
+        phases.push({
+          phase: 'refinement',
+          agentMessages: refinementFeedback,
+          timestamp: Date.now()
+        });
+        this.emit('phase:complete', { phase: 'refinement', sessionId, cycle: i + 1 });
+      }
+
+      // Phase 7: Final Output
+      const finalOutput = this.formatFinalOutput(phases, synthesis, predictiveOutput);
+      phases.push({
+        phase: 'final',
+        timestamp: Date.now()
+      });
+
+      this.sessionHistory.set(sessionId, phases);
+
+      const response: CouncilResponse = {
+        sessionId,
+        phases,
+        finalOutput,
+        nextDirective: 'Prime Architect, what is your directive?'
+      };
+
+      // Update metrics
+      const processingTime = Date.now() - startTime;
+      this.updateMetrics(processingTime, debateConflicts.length > 0);
+      
+      this.emit('session:complete', { sessionId, response, processingTime });
+      this.log(`Session ${sessionId} completed in ${processingTime}ms`);
+
+      return response;
+
+    } catch (error) {
+      this.log(`Error in session ${sessionId}:`, error);
+      this.emit('session:error', { sessionId, error });
+      throw error;
     }
-
-    // Phase 7: Final Output
-    const finalOutput = this.formatFinalOutput(phases, synthesis, predictiveOutput);
-    phases.push({
-      phase: 'final',
-      timestamp: Date.now()
-    });
-
-    this.sessionHistory.set(sessionId, phases);
-
-    return {
-      sessionId,
-      phases,
-      finalOutput,
-      nextDirective: 'Prime Architect, what is your directive?'
-    };
   }
 
   private async generateInitialResponses(query: UserQuery): Promise<AgentMessage[]> {
-    // Simulate multi-agent responses based on archetypes
-    return this.state.agents.map(agent => ({
-      agentId: agent.id,
-      agentName: agent.name,
-      content: this.simulateAgentResponse(agent, query),
-      timestamp: Date.now(),
-      archetype: agent.archetype,
-      color: agent.color
-    }));
+    return this.state.agents.map(agent => {
+      const message: AgentMessage = {
+        agentId: agent.id,
+        agentName: agent.name,
+        content: this.simulateAgentResponse(agent, query),
+        timestamp: Date.now(),
+        archetype: agent.archetype,
+        color: agent.color
+      };
+
+      // Update metrics
+      this.metrics.agentResponseCount[agent.id] = 
+        (this.metrics.agentResponseCount[agent.id] || 0) + 1;
+
+      return message;
+    });
   }
 
   private simulateAgentResponse(agent: AgentConfig, query: UserQuery): string {
@@ -292,7 +396,6 @@ export class CouncilOrchestrator {
   ): Promise<CrossAgentComment[]> {
     const comments: CrossAgentComment[] = [];
     
-    // Generate cross-agent interactions
     for (let i = 0; i < responses.length; i++) {
       for (let j = 0; j < responses.length; j++) {
         if (i !== j && Math.random() < this.CROSS_AGENT_INTERACTION_PROBABILITY) {
@@ -321,8 +424,10 @@ export class CouncilOrchestrator {
     responses: AgentMessage[],
     comments: CrossAgentComment[]
   ): Promise<DebateConflict[]> {
-    // Detect conflicts based on cross-agent challenges
     const conflicts: DebateConflict[] = [];
+    
+    if (comments.length === 0) return conflicts;
+
     const challengeCount = comments.filter(c => c.type === 'challenge').length;
     const disagreementPercentage = (challengeCount / comments.length) * 100;
 
@@ -344,11 +449,10 @@ export class CouncilOrchestrator {
     conflicts: DebateConflict[],
     query: UserQuery
   ): Promise<DebateConflict[]> {
-    // Resolve conflicts through structured debate
     return conflicts.map(conflict => ({
       ...conflict,
       resolved: true,
-      resolution: 'Through systematic debate, agents converged on a synthesized approach that...'
+      resolution: 'Through systematic debate, agents converged on a synthesized approach that integrates multiple perspectives while maintaining logical coherence and practical feasibility.'
     }));
   }
 
@@ -366,7 +470,7 @@ export class CouncilOrchestrator {
       unifiedConclusion: `After thorough multi-agent analysis and debate, the council concludes that ${query.content} should be approached through an integrated strategy combining logical rigor, ethical consideration, and practical implementation.`,
       actionPlan: [
         'Phase 1: Establish foundational framework and requirements',
-        'Phase 2: Implement core architecture with testing',
+        'Phase 2: Implement core architecture with comprehensive testing',
         'Phase 3: Iterate based on feedback and edge cases',
         'Phase 4: Deploy with monitoring and continuous improvement'
       ],
@@ -439,7 +543,7 @@ export class CouncilOrchestrator {
     return this.state.agents.slice(0, 3).map(agent => ({
       agentId: agent.id,
       agentName: agent.name,
-      content: `[${agent.name}] Refinement cycle ${this.state.refinementCycle}: The synthesis could be strengthened by...`,
+      content: `[${agent.name}] Refinement cycle ${this.state.refinementCycle}: The synthesis could be strengthened by incorporating additional ${agent.archetype.toLowerCase()} perspectives...`,
       timestamp: Date.now(),
       archetype: agent.archetype,
       color: agent.color
@@ -451,7 +555,7 @@ export class CouncilOrchestrator {
     synthesis: SynthesisOutput,
     predictive?: PredictiveModeOutput
   ): string {
-    let output = '=== OMNIFORGE COUNCIL OUTPUT ===\n\n';
+    let output = '=== OMNIFORGE COUNCIL - ENTERPRISE EDITION ===\n\n';
     
     output += '=== INITIAL AGENT RESPONSES ===\n';
     const initialPhase = phases.find(p => p.phase === 'initial');
@@ -509,23 +613,73 @@ export class CouncilOrchestrator {
     return output;
   }
 
-  getState(): CouncilState {
-    return this.state;
-  }
+  private updateMetrics(processingTime: number, hadDebate: boolean): void {
+    this.metrics.sessionsProcessed++;
+    
+    // Update average response time
+    const previousTotal = this.metrics.averageResponseTime * (this.metrics.sessionsProcessed - 1);
+    this.metrics.averageResponseTime = (previousTotal + processingTime) / this.metrics.sessionsProcessed;
 
-  updateConfig(config: Partial<CouncilState>): void {
-    this.state = { ...this.state, ...config };
-  }
-
-  setInteractionProbability(probability: number): void {
-    if (probability >= 0 && probability <= 1) {
-      (this as any).CROSS_AGENT_INTERACTION_PROBABILITY = probability;
+    // Update debate resolution rate
+    if (hadDebate) {
+      const previousResolved = this.metrics.debateResolutionRate * (this.metrics.sessionsProcessed - 1);
+      this.metrics.debateResolutionRate = (previousResolved + 100) / this.metrics.sessionsProcessed;
     }
   }
 
-  setDebateThreshold(threshold: number): void {
-    if (threshold >= 0 && threshold <= 100) {
-      (this as any).DEBATE_DISAGREEMENT_THRESHOLD = threshold;
+  /**
+   * Get current council state
+   */
+  getState(): CouncilState {
+    return { ...this.state };
+  }
+
+  /**
+   * Get performance metrics
+   */
+  getMetrics(): CouncilMetrics {
+    return { ...this.metrics };
+  }
+
+  /**
+   * Get session history for a specific session
+   */
+  getSessionHistory(sessionId: string): SessionMessage[] | undefined {
+    return this.sessionHistory.get(sessionId);
+  }
+
+  /**
+   * Update council configuration
+   */
+  updateConfig(config: Partial<CouncilState>): void {
+    this.state = { ...this.state, ...config };
+    this.emit('config:updated', this.state);
+    this.log('Configuration updated:', config);
+  }
+
+  /**
+   * Reset metrics
+   */
+  resetMetrics(): void {
+    this.metrics = this.initializeMetrics();
+    this.emit('metrics:reset');
+    this.log('Metrics reset');
+  }
+
+  /**
+   * Clear session history
+   */
+  clearHistory(): void {
+    this.sessionHistory.clear();
+    this.emit('history:cleared');
+    this.log('Session history cleared');
+  }
+
+  private log(...args: any[]): void {
+    if (this.config.enableLogging) {
+      console.log('[CouncilEngine]', ...args);
     }
   }
 }
+
+export default CouncilEngine;
